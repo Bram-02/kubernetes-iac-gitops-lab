@@ -5,8 +5,9 @@ terraform {
 }
 
 resource "kind_cluster" "lab" {
-  name           = "skomawan-lab"
-  wait_for_ready = true
+  name            = "skomawan-lab"
+  wait_for_ready  = true
+  kubeconfig_path = pathexpand("~/.kube/kind-skomawan-lab")
 
   kind_config {
     kind        = "Cluster"

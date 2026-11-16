@@ -14,8 +14,10 @@ spec:
     helm:
       parameters:
         - name: image.tag
-          value: b5b2ff071f9851086cc6a09a465743fb0b8a3718
+          value: 980e57725b96ef6bf4ac628745991ff1f9c924f9
         - name: ingress.enabled
+          value: "false"
+        - name: autoscaling.enabled
           value: "false"
   destination:
     server: https://kubernetes.default.svc

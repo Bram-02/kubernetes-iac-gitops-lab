@@ -34,7 +34,17 @@ variable "argocd_chart_version" {
 
 # Lapisan 2: platform
 resource "kubernetes_namespace_v1" "website" {
-  metadata { name = "website" }
+  metadata {
+    name = "website"
+    labels = {
+      "pod-security.kubernetes.io/enforce"         = "restricted"
+      "pod-security.kubernetes.io/enforce-version" = "v1.37"
+      "pod-security.kubernetes.io/warn"            = "restricted"
+      "pod-security.kubernetes.io/warn-version"    = "v1.37"
+      "pod-security.kubernetes.io/audit"           = "restricted"
+      "pod-security.kubernetes.io/audit-version"   = "v1.37"
+    }
+  }
 }
 
 resource "helm_release" "argocd" {
@@ -72,8 +82,8 @@ resource "helm_release" "root_app" {
   values = [yamlencode({
     applications = {
       root = {
-        namespace = "argocd"
-        project   = "default"
+        namespace  = "argocd"
+        project    = "default"
         finalizers = ["resources-finalizer.argocd.argoproj.io"]
         source = {
           repoURL        = "https://github.com/Bram-02/latihan-devops.git"
