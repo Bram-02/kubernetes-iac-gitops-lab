@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: website
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: Website Bram, lingkungan dev dan prod
+  sourceRepos:
+    - https://github.com/Bram-02/latihan-devops.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: website-dev
+    - server: https://kubernetes.default.svc
+      namespace: website-prod
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace

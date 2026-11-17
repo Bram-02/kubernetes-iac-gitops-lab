@@ -1,0 +1,5 @@
+# Pemilik bawaan seluruh repo
+*                                          @Bram-02
+# Konfigurasi prod dan Application Argo CD wajib direview pemiliknya
+/week11/kustomize/website/overlays/prod/   @Bram-02
+/week11/apps/                              @Bram-02

@@ -6,7 +6,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
+  project: website
   source:
     repoURL: https://github.com/Bram-02/latihan-devops.git
     targetRevision: main
