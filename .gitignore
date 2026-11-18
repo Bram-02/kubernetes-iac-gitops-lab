@@ -1,2 +1,10 @@
 rahasia.txt
 config.env
+
+# Pengaman umum: state, plan, cache provider, kubeconfig, dan rahasia
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*-config
+.env
