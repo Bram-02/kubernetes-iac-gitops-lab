@@ -86,7 +86,7 @@ resource "helm_release" "root_app" {
         project    = "default"
         finalizers = ["resources-finalizer.argocd.argoproj.io"]
         source = {
-          repoURL        = "https://github.com/Bram-02/latihan-devops.git"
+          repoURL        = "https://github.com/Bram-02/kubernetes-iac-gitops-lab.git"
           targetRevision = "main"
           path           = "week11/apps"
         }

@@ -8,7 +8,7 @@ metadata:
 spec:
   description: Website Bram, lingkungan dev dan prod
   sourceRepos:
-    - https://github.com/Bram-02/latihan-devops.git
+    - https://github.com/Bram-02/kubernetes-iac-gitops-lab.git
   destinations:
     - server: https://kubernetes.default.svc
       namespace: website-dev
