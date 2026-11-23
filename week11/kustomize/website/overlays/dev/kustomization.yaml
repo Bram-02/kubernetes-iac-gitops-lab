@@ -9,7 +9,7 @@ labels:
     includeTemplates: true
 images:
   - name: ghcr.io/bram-02/devops-website-bram
-    newTag: 814cd6cbc9bdbc3a1827c5c91d599e32e05876f1
+    newTag: 1039a0b9515ae9bdfdf43dab0fbba4efba9df4ed
 replicas:
   - name: website
     count: 1
