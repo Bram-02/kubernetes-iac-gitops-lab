@@ -1,0 +1,19 @@
+# pihak       harapan  verb    resource                                 namespace
+students      yes      list    pods                                     umkm-dev
+students      no       delete  pods                                     umkm-dev
+students      no       get     secrets                                  umkm-dev
+students      no       get     pods                                     umkm-prod
+katalog-dev   yes      create  deployments.apps                         umkm-dev
+katalog-dev   yes      get     secrets                                  umkm-dev
+katalog-dev   no       create  rolebindings.rbac.authorization.k8s.io   umkm-dev
+katalog-dev   yes      get     pods                                     umkm-prod
+katalog-dev   no       delete  pods                                     umkm-prod
+katalog-dev   no       get     secrets                                  umkm-prod
+platform      yes      create  rolebindings.rbac.authorization.k8s.io   umkm-prod
+platform      yes      get     secrets                                  umkm-prod
+platform      no       list    nodes                                    umkm-prod
+platform      no       get     pods                                     kube-system
+argocd        yes      update  deployments.apps                         umkm-prod
+argocd        no       get     secrets                                  kube-system
+katalog-sa    no       list    pods                                     umkm-prod
+katalog-sa    no       get     secrets                                  umkm-prod
