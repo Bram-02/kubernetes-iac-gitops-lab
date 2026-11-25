@@ -2,7 +2,7 @@
 
 Lab pribadi untuk membangun platform Kubernetes **sepenuhnya dari kode** dan mengelola aplikasinya secara **GitOps**: cluster multi-node dibuat dengan OpenTofu, Argo CD dipasang sebagai lapisan platform, lalu aplikasi di lingkungan **dev** dan **prod** di-deploy, dipromosikan, dan di-rollback hanya lewat Git.
 
-> **English summary:** Personal lab that builds a Kubernetes platform entirely from code and runs applications GitOps-style. OpenTofu provisions a 3-node kind cluster and a platform layer (namespace with a pinned *restricted* Pod Security level, Argo CD, and a single root Application). Argo CD then deploys a website to **dev** and **prod** from Kustomize overlays (app of apps). Releases are promoted dev → prod through pull requests with the **same image tag** (no rebuild), rolled back with `git revert`, protected by an Argo CD **AppProject** and **CODEOWNERS**, and drift is reverted automatically by self-heal. The website image comes from [devops-website-bram](https://github.com/Bram-02/devops-website-bram), whose CI scans and publishes it to GHCR.
+> **English summary:** Personal lab that builds a Kubernetes platform entirely from code and runs applications GitOps-style. OpenTofu provisions a 3-node kind cluster and a platform layer (namespace with a pinned *restricted* Pod Security level, Argo CD, and a single root Application). Argo CD then deploys a website to **dev** and **prod** from Kustomize overlays (app of apps). Releases are promoted dev → prod through pull requests with the **same image tag** (no rebuild), rolled back with `git revert`, protected by an Argo CD **AppProject** and **CODEOWNERS**, and drift is reverted automatically by self-heal. Further labs manage stateful workloads and persistent volumes with OpenTofu (week 11) and access control as code (week 13): RBAC for five parties verified by an automated `kubectl auth can-i` matrix, a namespace enforcing the *restricted* Pod Security level, and default-deny NetworkPolicies. The website image comes from [devops-website-bram](https://github.com/Bram-02/devops-website-bram), whose CI scans and publishes it to GHCR.
 
 **Penyusun:** Bram Naibaho · D3 Teknologi Komputer, Institut Teknologi Del · [LinkedIn](https://www.linkedin.com/in/bram-modestus-naibaho-95866b387/)
 
@@ -65,6 +65,11 @@ OpenTofu berhenti di bootstrap (Argo CD + satu Application `root`); setelah itu 
 │       └── overlays/
 │           ├── dev/        # namespace website-dev, 1 replika, label lingkungan=dev
 │           └── prod/       # namespace website-prod, 3 replika, batas memori 128Mi
+│   ├── opentofu-wordpress/ # Praktikum: Secret (variabel sensitive) + MariaDB + WordPress, bukti emptyDir hilang
+│   └── opentofu-pv/        # Praktikum: PersistentVolume (kelas manual, node_affinity, Retain) + PVC + Nginx
+├── week13/                 # Keamanan, identitas, akses (lihat week13/README.md)
+│   ├── rbac/               # Namespace PSA, RBAC 5 pihak, default deny, uji matriks akses (cek-akses.sh)
+│   └── katalog/            # Workload lolos restricted + NetworkPolicy khusus frontend
 ├── .github/CODEOWNERS      # Perubahan prod dan Application wajib direview pemilik
 │
 ├── ansible/                # Fondasi: playbook idempoten, perbaikan Nova (KVM ke QEMU) di OpenStack
@@ -153,6 +158,8 @@ Versi yang sengaja rusak (tag image yang tidak ada) dirilis ke dev: pod baru `Im
 - **Kubeconfig per cluster.** kind menulis ke `~/.kube/kind-skomawan-lab`, sehingga membangun dan menghapus lab tidak merusak akses ke cluster lain.
 - **Kustomize: satu image, banyak lingkungan.** Base dirender dari Helm chart yang sama dengan production; overlay hanya memuat perbedaan (namespace, replika, memori, label). Label lingkungan memakai `includeTemplates: true` agar ikut ke pod tanpa mengubah selector.
 - **Merge adalah gerbang deploy.** Argo CD hanya mengikuti `main`; perubahan prod dan definisi Application dijaga CODEOWNERS, dan AppProject membatasi repo serta namespace tujuan.
+- **Data tetap ada hanya dengan PV.** Praktikum Week 11 membuktikan tabel MariaDB di emptyDir hilang saat Pod diganti, sedangkan halaman nginx di PV + PVC tetap ada, bahkan setelah PV dan PVC dihapus (`Retain`). PV memakai kelas `manual` agar tidak diambil StorageClass bawaan kind, dan `node_affinity` karena hostPath hanya ada di satu dari dua worker.
+- **Akses diuji, bukan dicoba-coba.** Week 13 menulis RBAC lima pihak sebagai OpenTofu dan menguji 18 baris matriks akses dengan `kubectl auth can-i --as`. Uji drift menunjukkan `tofu plan` hanya menangkap perubahan pada resource yang dikelolanya; RoleBinding tambahan yang dibuat manual hanya tertangkap oleh uji matriks dan audit `can-i --list`.
 - **Keamanan bawaan.** Namespace dikunci Pod Security `restricted` dengan versi tetap; tidak ada state, plan, kubeconfig, atau `.env` di repository (dicek dengan Gitleaks di seluruh riwayat).
 
 ## Kendala yang dihadapi
