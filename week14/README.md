@@ -1,6 +1,6 @@
-# Week 14: Secrets management dengan Sealed Secrets
+# Week 14: Secrets management (Sealed Secrets dan encryption at rest)
 
-Rahasia aplikasi (password database Katalog) disimpan **di Git dalam bentuk terenkripsi** sehingga tetap bisa dikelola GitOps, tanpa pernah menulis password asli ke file atau layar.
+Rahasia aplikasi (password database Katalog) disimpan **di Git dalam bentuk terenkripsi** sehingga tetap bisa dikelola GitOps, tanpa pernah menulis password asli ke file atau layar. Di dalam cluster, Secret hasilnya juga dienkripsi di etcd (encryption at rest).
 
 ## Cara kerja
 
@@ -47,4 +47,36 @@ Skrip menolak menulis ke dalam repo Git, tidak menyentuh backup lama bila cluste
 
 - File backup setara dengan semua password yang pernah di-seal: tidak pernah di-commit (dijaga `.gitignore`), tidak ditampilkan, disimpan terpisah dari cluster (password manager atau vault offline).
 - Controller memakai kunci **terbaru** untuk mengenkripsi dan membuat kunci baru secara berkala (bawaan 30 hari). Backup harus diulang setiap ada kunci baru; backup lama tidak bisa membuka rahasia yang di-seal dengan kunci yang lebih baru.
+- Kunci aktif ditentukan dari waktu sertifikatnya. Setelah restore, `creationTimestamp` kunci lama justru lebih baru, tetapi sidik jari SHA-256 dari `kubeseal --fetch-cert` tetap sama dengan kunci terbaru (`d4rtf`).
 - Pemulihan: `kubectl apply -f` file backup, lalu `kubectl rollout restart deploy/sealed-secrets-controller -n kube-system`.
+
+## Encryption at rest di etcd
+
+Setelah dibuka controller, SealedSecret menjadi Secret biasa. Isinya hanya base64, dan bawaan kind menyimpannya **polos** di etcd. Siapa pun yang memegang file atau snapshot etcd bisa membacanya, tanpa kunci Sealed Secrets dan tanpa izin RBAC.
+
+| Lapisan | Ancaman | Pelindung |
+| --- | --- | --- |
+| Git | Repo bocor atau dibaca publik | Sealed Secrets |
+| API Kubernetes | Pengguna yang boleh `get secrets` | RBAC (Week 13, `matriks-akses.txt`) |
+| etcd | File, disk, atau snapshot etcd | Encryption at rest (`secretbox`) |
+
+```bash
+enkripsi-etcd/aktifkan-enkripsi.sh                      # sekali per cluster
+kubectl get secrets -A -o json | kubectl replace -f -   # tulis ulang Secret lama
+enkripsi-etcd/cek-enkripsi.sh                           # setiap Secret harus berheader k8s:enc:
+```
+
+`aktifkan-enkripsi.sh` membuat kunci acak 32 byte di dalam node control-plane (tidak pernah tampil), menyalinnya ke `~/.secrets/etcd-encryption-config.yaml` (600), menyimpan manifest lama di luar folder `manifests`, lalu menunggu kube-apiserver **baru** siap. `cek-enkripsi.sh` hanya membaca 8 byte pertama tiap nilai di etcd.
+
+| Uji (langsung ke etcd dengan `etcdctl`) | Hasil |
+| --- | --- |
+| `katalog-db` sebelum enkripsi | Diawali `k8s\0` (protobuf polos); password asli ditemukan di nilai etcd |
+| Secret baru setelah enkripsi aktif | Diawali `k8s:enc:secretbox:v1:key1:`, sisanya ciphertext |
+| `katalog-db` lama setelah enkripsi aktif | Masih `k8s\0`: data lama tidak terenkripsi otomatis |
+| Setelah semua Secret ditulis ulang | `4 Secret di etcd, 0 masih polos`; password tidak ditemukan lagi |
+
+- Urutan provider menentukan: `secretbox` (pertama) dipakai untuk setiap tulis, `identity` hanya untuk membaca data lama yang belum ditulis ulang.
+- Kunci etcd juga harus di-backup dan dijaga `.gitignore`: tanpanya snapshot etcd tidak bisa dibuka, dengannya semua Secret terbaca.
+- Batasan: kunci statis tersimpan di disk node yang sama dengan etcd. Ini melindungi snapshot, backup, dan disk etcd yang bocor, bukan akses root ke node itu. Di produksi dipakai provider KMS v2 agar kunci berada di luar cluster.
+- Perubahan dibuat langsung di node (static Pod), di luar OpenTofu `week10/cluster`. Cluster yang dibuat ulang dengan `tofu apply` kembali tanpa enkripsi: jalankan ulang skrip, tulis ulang Secret, lalu `cek-enkripsi.sh`.
+- Versi pertama pengecek mati diam-diam karena SIGPIPE (`head -c 8` bersama `pipefail`) tanpa mencetak ringkasan. Pengecek harus selalu mencetak ringkasan, dan exit code-nya ikut diperiksa.
