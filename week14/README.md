@@ -66,6 +66,7 @@ Argo CD hanya pernah melihat ciphertext; yang membukanya tetap controller Sealed
 | SealedSecret yang sebelumnya dibuat dengan `kubectl apply` | Diambil alih Argo CD (`tracking-id` `katalog-secrets:bitnami.com/SealedSecret:umkm-prod/katalog-db`), `Synced Healthy` |
 | `kubectl delete sealedsecret katalog-db` | Dalam hitungan detik SealedSecret dan Secret kembali dari Git; sidik password sama sebelum dan sesudah |
 | Application uji (tidak di-commit) memakai project `katalog` untuk overlay website | Ditolak: `resource :ConfigMap`, `:Service`, dan `apps:Deployment is not permitted in project katalog`; di `umkm-prod` tetap hanya `katalog-web` |
+| Rotasi password hanya lewat commit dan push, tanpa `kubectl apply` | Sidik password berubah; `.status.sync.revision` Application sama dengan `git rev-parse HEAD` (audit trail di riwayat Git) |
 
 - Tanpa finalizer, menghapus Application tidak ikut menghapus SealedSecret dan Secret-nya: kehilangan password database lebih mahal daripada objek yatim yang bisa dibersihkan manual.
 - Self-heal juga berarti perubahan rahasia harus lewat Git; perubahan manual di cluster dikembalikan ke isi Git.
