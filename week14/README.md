@@ -63,10 +63,10 @@ Setelah dibuka controller, SealedSecret menjadi Secret biasa. Isinya hanya base6
 ```bash
 enkripsi-etcd/aktifkan-enkripsi.sh                      # sekali per cluster
 kubectl get secrets -A -o json | kubectl replace -f -   # tulis ulang Secret lama
-enkripsi-etcd/cek-enkripsi.sh                           # setiap Secret harus berheader k8s:enc:
+enkripsi-etcd/cek-enkripsi.sh                           # setiap Secret harus berheader k8s:enc:, dilaporkan per kunci
 ```
 
-`aktifkan-enkripsi.sh` membuat kunci acak 32 byte di dalam node control-plane (tidak pernah tampil), menyalinnya ke `~/.secrets/etcd-encryption-config.yaml` (600), menyimpan manifest lama di luar folder `manifests`, lalu menunggu kube-apiserver **baru** siap. `cek-enkripsi.sh` hanya membaca 8 byte pertama tiap nilai di etcd.
+`aktifkan-enkripsi.sh` membuat kunci acak 32 byte di dalam node control-plane (tidak pernah tampil), menyalinnya ke `~/.secrets/etcd-encryption-config.yaml` (600), menyimpan manifest lama di luar folder `manifests`, lalu menunggu kube-apiserver **baru** siap. `cek-enkripsi.sh` hanya membaca header tiap nilai di etcd dan melaporkan kunci yang dipakai, misalnya `secretbox:key1=4`.
 
 | Uji (langsung ke etcd dengan `etcdctl`) | Hasil |
 | --- | --- |
@@ -80,3 +80,25 @@ enkripsi-etcd/cek-enkripsi.sh                           # setiap Secret harus be
 - Batasan: kunci statis tersimpan di disk node yang sama dengan etcd. Ini melindungi snapshot, backup, dan disk etcd yang bocor, bukan akses root ke node itu. Di produksi dipakai provider KMS v2 agar kunci berada di luar cluster.
 - Perubahan dibuat langsung di node (static Pod), di luar OpenTofu `week10/cluster`. Cluster yang dibuat ulang dengan `tofu apply` kembali tanpa enkripsi: jalankan ulang skrip, tulis ulang Secret, lalu `cek-enkripsi.sh`.
 - Versi pertama pengecek mati diam-diam karena SIGPIPE (`head -c 8` bersama `pipefail`) tanpa mencetak ringkasan. Pengecek harus selalu mencetak ringkasan, dan exit code-nya ikut diperiksa.
+
+### Rotasi kunci etcd
+
+Kunci lama tidak bisa langsung diganti: Secret yang dienkripsi dengannya tidak bisa dibaca lagi. `rotasi-kunci.sh` memisahkan tiga tahap:
+
+```bash
+enkripsi-etcd/rotasi-kunci.sh tambah                     # kunci baru di urutan pertama, kunci lama tetap untuk membaca
+kubectl get secrets -A -o json | kubectl replace -f -    # semua Secret pindah ke kunci baru
+enkripsi-etcd/rotasi-kunci.sh buang-lama                 # hanya jalan bila SEMUA Secret sudah memakai kunci terbaru
+```
+
+| Uji | Hasil |
+| --- | --- |
+| Awal | `secretbox:key1=4` |
+| `tambah` | Konfigurasi `key20261126034916 key1`, kube-apiserver di-restart |
+| `buang-lama` sebelum Secret ditulis ulang | Ditolak, `exit=1`: 4 Secret masih `key1` (termasuk kunci Sealed Secrets dan release Helm) |
+| Setelah ditulis ulang | `secretbox:key20261126034916=4`, sekaligus bukti apiserver memuat konfigurasi baru |
+| `buang-lama` | Tersisa `key20261126034916`, Secret masih terbaca lewat API, SealedSecret `katalog-db` tetap `SYNCED True` |
+
+- Perubahan isi `enc.yaml` tidak memicu kubelet (beda dengan perubahan manifest), jadi skrip menghentikan container apiserver dengan `crictl stop` agar dijalankan ulang.
+- Apiserver memasang **folder** `enc`, bukan file, sehingga file pengganti (tulis lalu `mv`) langsung terlihat.
+- Setiap tahap memperbarui `~/.secrets/etcd-encryption-config.yaml`. Setelah `buang-lama`, snapshot etcd yang dibuat sebelum rotasi tidak bisa dibuka dengan salinan ini lagi.

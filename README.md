@@ -71,7 +71,7 @@ OpenTofu berhenti di bootstrap (Argo CD + satu Application `root`); setelah itu 
 │   ├── rbac/               # Namespace PSA, RBAC 5 pihak, default deny, uji matriks akses (cek-akses.sh)
 │   └── katalog/            # Workload lolos restricted + NetworkPolicy khusus frontend
 ├── week14/secrets/         # Sealed Secrets: controller (OpenTofu, Helm), SealedSecret katalog-db (lihat README)
-├── week14/enkripsi-etcd/   # Encryption at rest (secretbox) untuk Secret di etcd, plus pengecek langsung ke etcd
+├── week14/enkripsi-etcd/   # Encryption at rest (secretbox) untuk Secret di etcd: aktifkan, cek per kunci, rotasi kunci
 ├── .github/CODEOWNERS      # Perubahan prod dan Application wajib direview pemilik
 │
 ├── ansible/                # Fondasi: playbook idempoten, perbaikan Nova (KVM ke QEMU) di OpenStack
@@ -162,7 +162,7 @@ Versi yang sengaja rusak (tag image yang tidak ada) dirilis ke dev: pod baru `Im
 - **Merge adalah gerbang deploy.** Argo CD hanya mengikuti `main`; perubahan prod dan definisi Application dijaga CODEOWNERS, dan AppProject membatasi repo serta namespace tujuan.
 - **Data tetap ada hanya dengan PV.** Praktikum Week 11 membuktikan tabel MariaDB di emptyDir hilang saat Pod diganti, sedangkan halaman nginx di PV + PVC tetap ada, bahkan setelah PV dan PVC dihapus (`Retain`). PV memakai kelas `manual` agar tidak diambil StorageClass bawaan kind, dan `node_affinity` karena hostPath hanya ada di satu dari dua worker.
 - **Akses diuji, bukan dicoba-coba.** Week 13 menulis RBAC lima pihak sebagai OpenTofu dan menguji 18 baris matriks akses dengan `kubectl auth can-i --as`. Uji drift menunjukkan `tofu plan` hanya menangkap perubahan pada resource yang dikelolanya; RoleBinding tambahan yang dibuat manual hanya tertangkap oleh uji matriks dan audit `can-i --list`.
-- **Rahasia di Git, terenkripsi.** Password Katalog dibuat acak di dalam pipa, di-seal dengan kunci publik controller, lalu di-commit sebagai SealedSecret. Disalin ke namespace lain, file itu gagal dibuka; kunci privat yang hilang membuat semua SealedSecret tidak terbaca sampai kunci dipulihkan dari backup, yang dijaga `.gitignore` agar tidak pernah masuk Git. Di etcd, Secret dienkripsi dengan `secretbox`; Secret lama ditulis ulang dan diverifikasi langsung lewat `etcdctl`.
+- **Rahasia di Git, terenkripsi.** Password Katalog dibuat acak di dalam pipa, di-seal dengan kunci publik controller, lalu di-commit sebagai SealedSecret. Disalin ke namespace lain, file itu gagal dibuka; kunci privat yang hilang membuat semua SealedSecret tidak terbaca sampai kunci dipulihkan dari backup, yang dijaga `.gitignore` agar tidak pernah masuk Git. Di etcd, Secret dienkripsi dengan `secretbox`; Secret lama ditulis ulang dan diverifikasi langsung lewat `etcdctl`; kunci etcd dirotasi dalam tiga tahap, dan kunci lama hanya dibuang setelah semua Secret terbukti pindah.
 - **Keamanan bawaan.** Namespace dikunci Pod Security `restricted` dengan versi tetap; tidak ada state, plan, kubeconfig, atau `.env` di repository (dicek dengan Gitleaks di seluruh riwayat).
 
 ## Kendala yang dihadapi
