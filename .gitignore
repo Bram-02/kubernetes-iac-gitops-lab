@@ -12,3 +12,7 @@ config.env
 # Kunci privat Sealed Secrets dan backup-nya: setara semua rahasia, tidak boleh masuk Git
 *sealed-secrets-key*
 *-key-backup.yaml
+
+# Kunci encryption at rest etcd: tanpanya snapshot etcd tidak terbaca, dengannya semua Secret terbaca
+*encryption-config*.yaml
+enc.yaml
