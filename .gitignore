@@ -8,3 +8,7 @@ config.env
 *.tfplan
 *-config
 .env
+
+# Kunci privat Sealed Secrets dan backup-nya: setara semua rahasia, tidak boleh masuk Git
+*sealed-secrets-key*
+*-key-backup.yaml
