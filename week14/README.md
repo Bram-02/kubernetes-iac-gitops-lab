@@ -22,7 +22,7 @@ kubectl create secret generic katalog-db -n umkm-prod \
   --from-literal=password="$(openssl rand -base64 18)" \
   --dry-run=client -o yaml \
   | kubeseal --format yaml > secrets/katalog-db.sealedsecret.yaml
-kubectl apply -f secrets/katalog-db.sealedsecret.yaml   # dalam GitOps penuh dikerjakan Argo CD
+git add secrets/katalog-db.sealedsecret.yaml && git commit && git push   # Argo CD (katalog-secrets) yang menerapkan
 ```
 
 Password dibuat acak di dalam pipa: tidak tampil, tidak tersimpan di file. Hasil di cluster: `SYNCED True`, `secret/katalog-db` dengan `password: 24 bytes`, `username: 7 bytes`.
@@ -49,6 +49,26 @@ Skrip menolak menulis ke dalam repo Git, tidak menyentuh backup lama bila cluste
 - Controller memakai kunci **terbaru** untuk mengenkripsi dan membuat kunci baru secara berkala (bawaan 30 hari). Backup harus diulang setiap ada kunci baru; backup lama tidak bisa membuka rahasia yang di-seal dengan kunci yang lebih baru.
 - Kunci aktif ditentukan dari waktu sertifikatnya. Setelah restore, `creationTimestamp` kunci lama justru lebih baru, tetapi sidik jari SHA-256 dari `kubeseal --fetch-cert` tetap sama dengan kunci terbaru (`d4rtf`).
 - Pemulihan: `kubectl apply -f` file backup, lalu `kubectl rollout restart deploy/sealed-secrets-controller -n kube-system`.
+
+## GitOps: Argo CD menerapkan SealedSecret
+
+Dua file di `week11/apps/` (diawasi Application `root`):
+
+| File | Isi |
+| --- | --- |
+| `project-katalog.yaml` | AppProject `katalog`: hanya repo ini, hanya namespace `umkm-prod`, hanya objek `bitnami.com/SealedSecret`, tanpa objek tingkat cluster |
+| `katalog-secrets.yaml` | Application yang mengawasi `week14/secrets/*.sealedsecret.yaml`; `prune` dan `selfHeal` aktif; sengaja tanpa finalizer |
+
+Argo CD hanya pernah melihat ciphertext; yang membukanya tetap controller Sealed Secrets di cluster. Mengubah rahasia sekarang cukup lewat commit.
+
+| Uji | Hasil |
+| --- | --- |
+| SealedSecret yang sebelumnya dibuat dengan `kubectl apply` | Diambil alih Argo CD (`tracking-id` `katalog-secrets:bitnami.com/SealedSecret:umkm-prod/katalog-db`), `Synced Healthy` |
+| `kubectl delete sealedsecret katalog-db` | Dalam hitungan detik SealedSecret dan Secret kembali dari Git; sidik password sama sebelum dan sesudah |
+| Application uji (tidak di-commit) memakai project `katalog` untuk overlay website | Ditolak: `resource :ConfigMap`, `:Service`, dan `apps:Deployment is not permitted in project katalog`; di `umkm-prod` tetap hanya `katalog-web` |
+
+- Tanpa finalizer, menghapus Application tidak ikut menghapus SealedSecret dan Secret-nya: kehilangan password database lebih mahal daripada objek yatim yang bisa dibersihkan manual.
+- Self-heal juga berarti perubahan rahasia harus lewat Git; perubahan manual di cluster dikembalikan ke isi Git.
 
 ## Memperbarui SealedSecret: re-encrypt dan rotasi password
 
