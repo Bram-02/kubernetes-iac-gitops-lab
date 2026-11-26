@@ -50,6 +50,18 @@ Skrip menolak menulis ke dalam repo Git, tidak menyentuh backup lama bila cluste
 - Kunci aktif ditentukan dari waktu sertifikatnya. Setelah restore, `creationTimestamp` kunci lama justru lebih baru, tetapi sidik jari SHA-256 dari `kubeseal --fetch-cert` tetap sama dengan kunci terbaru (`d4rtf`).
 - Pemulihan: `kubectl apply -f` file backup, lalu `kubectl rollout restart deploy/sealed-secrets-controller -n kube-system`.
 
+## Memperbarui SealedSecret: re-encrypt dan rotasi password
+
+| Tindakan | Cara | Password | Kapan |
+| --- | --- | --- | --- |
+| Re-encrypt | `kubeseal --re-encrypt --format yaml` ke file baru, lalu `mv` | Tetap: sidik SHA-256 sebelum = sesudah | Setelah controller membuat kunci baru, agar file di Git memakai kunci terbaru |
+| Rotasi password | Secret baru dengan password acak dari `openssl rand`, lalu `kubeseal` | Berubah: sidik berbeda | Terjadwal, dan segera bila kunci atau password diduga bocor |
+
+- Re-encrypt tidak menghapus riwayat Git. Commit lama tetap menyimpan ciphertext lama yang bisa dibuka dengan kunci lama. Bila kunci bocor, yang melindungi hanya rotasi password, karena yang terbuka adalah password yang sudah tidak berlaku.
+- Sidik dibandingkan dengan 12 karakter awal SHA-256 password, sehingga sama atau berbedanya terlihat tanpa membuka password.
+- Keluaran `kubeseal --re-encrypt` ditulis ke file baru lalu `mv`, karena `> file` mengosongkan file sebelum sempat dibaca.
+- Di sistem nyata, password baru juga diganti di database dan aplikasi di-restart agar membaca Secret baru. Di lab ini Katalog belum memakai database.
+
 ## Encryption at rest di etcd
 
 Setelah dibuka controller, SealedSecret menjadi Secret biasa. Isinya hanya base64, dan bawaan kind menyimpannya **polos** di etcd. Siapa pun yang memegang file atau snapshot etcd bisa membacanya, tanpa kunci Sealed Secrets dan tanpa izin RBAC.
