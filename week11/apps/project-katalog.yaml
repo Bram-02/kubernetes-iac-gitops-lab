@@ -1,0 +1,21 @@
+# Hak Argo CD untuk Katalog UMKM Toba dibuat sesempit mungkin:
+# hanya repo ini, hanya namespace umkm-prod, hanya objek SealedSecret (ciphertext).
+# Deployment, RoleBinding, atau Secret polos yang terselip di folder sumber akan ditolak.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: katalog
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: Katalog UMKM Toba, hanya SealedSecret di umkm-prod
+  sourceRepos:
+    - https://github.com/Bram-02/kubernetes-iac-gitops-lab.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: umkm-prod
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: bitnami.com
+      kind: SealedSecret
